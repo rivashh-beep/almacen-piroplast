@@ -520,6 +520,10 @@
       <h2>Registro de Peso</h2>
       <p class="subtitulo" id="instruccion-peso"></p>
 
+      <button class="btn btn-confirmar" id="btn-conectar-balanza" onclick="iniciarEscuchaBalanza()" style="margin-bottom:16px;">
+        🔌 Conectar Balanza
+      </button>
+
       <div class="balanza-display">
         <div class="balanza-label">Lectura de Balanza</div>
         <div class="balanza-valor" id="balanza-valor">- - -</div>
@@ -857,8 +861,9 @@ function irAPaso(n) {
     activarEscuchaQR('input-qr', guardarQRInsumo);
   }
   if (n === 5) {
-    // En el futuro: iniciar lectura RS-232
-    iniciarEscuchaBalanza();
+    // Intenta reconectar solo si el navegador ya autorizó la balanza antes.
+    // Si es la primera vez, el operador debe tocar "Conectar Balanza".
+    intentarReconexionAutomatica();
   }
 }
 
@@ -1107,26 +1112,145 @@ function activarEscuchaQR(inputId, callback) {
 }
 
 // ============================================================
-// PASO 5: BALANZA RS-232
+// PASO 5: BALANZA RS-232 (Systel Flaier Plus) vía Web Serial API
+//
+// Protocolo confirmado con soporte técnico de Systel:
+//   - Comando: se envía un único byte $05 (ENQ), SIN CR ni LF.
+//     La detección de fin de trama en la balanza es por tiempo
+//     (silencio de ~5ms), no por caracteres de terminación.
+//   - Respuesta con peso estable: $02 + peso ASCII + $03 + checksum
+//   - Respuesta con peso inestable: un único byte $11 (WACK) —
+//     hay que reintentar hasta que el peso se estabilice.
 // ============================================================
-function iniciarEscuchaBalanza() {
-  // FASE 2: Cuando la balanza esté conectada vía USB-Serie,
-  // usarás la Web Serial API:
-  //
-  // const port = await navigator.serial.requestPort();
-  // await port.open({ baudRate: 9600 });
-  // const reader = port.readable.getReader();
-  // while (true) {
-  //   const { value, done } = await reader.read();
-  //   const texto = new TextDecoder().decode(value);
-  //   const peso = parseFloat(texto.match(/[\d.]+/)?.[0]);
-  //   if (peso > 0) { recibirPesoDesdeBalanza(peso); break; }
-  // }
+let puertoBalanza = null;
+let leyendoBalanza = false;
 
+async function intentarReconexionAutomatica() {
   document.getElementById('balanza-valor').textContent = '- - -';
   document.getElementById('balanza-estado').className = 'balanza-estado esperando';
   document.getElementById('pulso-dot').className = 'pulso';
-  document.getElementById('balanza-estado-texto').textContent = 'Esperando lectura...';
+
+  if (!('serial' in navigator)) {
+    document.getElementById('balanza-estado-texto').textContent = 'Web Serial no soportado en este navegador.';
+    return;
+  }
+
+  try {
+    const puertos = await navigator.serial.getPorts(); // ya autorizados previamente
+    if (puertos.length > 0 && !puertoBalanza) {
+      puertoBalanza = puertos[0];
+      await puertoBalanza.open({ baudRate: 9600, dataBits: 8, parity: 'none', stopBits: 1 });
+      document.getElementById('btn-conectar-balanza').style.display = 'none';
+      document.getElementById('balanza-estado-texto').textContent = 'Balanza conectada. Esperando peso estable...';
+      leerPesoBalanza();
+    } else if (!puertoBalanza) {
+      document.getElementById('balanza-estado-texto').textContent = 'Toque "Conectar Balanza" para iniciar.';
+    }
+  } catch (err) {
+    document.getElementById('balanza-estado-texto').textContent = 'Toque "Conectar Balanza" para iniciar.';
+  }
+}
+
+async function iniciarEscuchaBalanza() {
+  document.getElementById('balanza-valor').textContent = '- - -';
+  document.getElementById('balanza-estado').className = 'balanza-estado esperando';
+  document.getElementById('pulso-dot').className = 'pulso';
+  document.getElementById('balanza-estado-texto').textContent = 'Conectando con la balanza...';
+
+  if (!('serial' in navigator)) {
+    document.getElementById('balanza-estado-texto').textContent = 'Web Serial no soportado. Use el modo manual.';
+    return;
+  }
+
+  try {
+    if (!puertoBalanza) {
+      puertoBalanza = await navigator.serial.requestPort();
+      await puertoBalanza.open({ baudRate: 9600, dataBits: 8, parity: 'none', stopBits: 1 });
+    }
+    document.getElementById('btn-conectar-balanza').style.display = 'none';
+    document.getElementById('balanza-estado-texto').textContent = 'Balanza conectada. Esperando peso estable...';
+    leerPesoBalanza();
+  } catch (err) {
+    document.getElementById('balanza-estado-texto').textContent = 'Error al conectar: ' + err.message;
+  }
+}
+
+async function leerPesoBalanza() {
+  if (leyendoBalanza) return; // evita lecturas superpuestas
+  leyendoBalanza = true;
+
+  const writer = puertoBalanza.writable.getWriter();
+  const reader = puertoBalanza.readable.getReader();
+
+  try {
+    let intentos = 0;
+    const MAX_INTENTOS = 30;
+
+    while (intentos < MAX_INTENTOS) {
+      intentos++;
+
+      // Enviar EXACTAMENTE un byte (ENQ), sin CR ni LF
+      await writer.write(new Uint8Array([0x05]));
+
+      const bytes = await leerConTimeout(reader, 800);
+
+      if (bytes.length === 0) {
+        // sin respuesta: reintentar
+        await new Promise(r => setTimeout(r, 300));
+        continue;
+      }
+
+      // WACK: peso inestable, la balanza pide espera
+      if (bytes.length === 1 && bytes[0] === 0x11) {
+        document.getElementById('balanza-estado-texto').textContent = 'Peso inestable, esperando...';
+        await new Promise(r => setTimeout(r, 500));
+        continue;
+      }
+
+      // Trama válida: 0x02 + peso ASCII + 0x03 + checksum
+      if (bytes[0] === 0x02) {
+        const idxETX = bytes.indexOf(0x03);
+        if (idxETX > 0) {
+          const pesoStr = new TextDecoder().decode(bytes.slice(1, idxETX));
+          const peso = parseFloat(pesoStr);
+          if (!isNaN(peso)) {
+            recibirPesoDesdeBalanza(peso);
+            break;
+          }
+        }
+      }
+
+      // cualquier otra respuesta (ej. error E5): reintentar
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    if (intentos >= MAX_INTENTOS) {
+      document.getElementById('balanza-estado-texto').textContent = 'No se pudo leer el peso. Verifique la balanza e intente de nuevo.';
+    }
+  } catch (err) {
+    document.getElementById('balanza-estado-texto').textContent = 'Error de lectura: ' + err.message;
+  } finally {
+    writer.releaseLock();
+    reader.releaseLock();
+    leyendoBalanza = false;
+  }
+}
+
+// Lee bytes disponibles del puerto durante `timeoutMs`, o hasta que llegue algo
+function leerConTimeout(reader, timeoutMs) {
+  return new Promise(async (resolve) => {
+    let acumulado = [];
+    const timer = setTimeout(() => resolve(new Uint8Array(acumulado)), timeoutMs);
+    try {
+      const { value, done } = await reader.read();
+      clearTimeout(timer);
+      if (!done && value) acumulado = Array.from(value);
+      resolve(new Uint8Array(acumulado));
+    } catch (e) {
+      clearTimeout(timer);
+      resolve(new Uint8Array(acumulado));
+    }
+  });
 }
 
 function recibirPesoDesdeBalanza(gramos) {
