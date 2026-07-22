@@ -1,0 +1,11 @@
+ext {
+    cdvMinSdkVersion = project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24
+    cdvBuildToolsVersion = project.hasProperty('buildToolsVersion') ? rootProject.ext.buildToolsVersion : '35.0.0'
+    // Determine java version
+    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
+        javaVersion = JavaVersion.VERSION_1_8
+    } else {
+        javaVersion = JavaVersion.VERSION_17
+    }
+    cdvPluginPostBuildExtras = []
+}
