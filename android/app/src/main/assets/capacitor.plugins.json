@@ -1,0 +1,6 @@
+[
+	{
+		"pkg": "@adeunis/capacitor-serial",
+		"classpath": "com.adeunis.capacitor.serial.SerialPlugin"
+	}
+]

@@ -1,0 +1,11 @@
+{
+	"appId": "com.piroplast.almacen",
+	"appName": "Almacén Piroplast",
+	"webDir": "www",
+	"server": {
+		"androidScheme": "https"
+	},
+	"android": {
+		"allowMixedContent": false
+	}
+}
