@@ -936,9 +936,14 @@ function detenerCamara() {
 }
 
 function iniciarReconocimientoVoz() {
+  // En la app empaquetada (Capacitor/Android), el WebView no tiene el
+  // servicio de reconocimiento de voz de Google conectado -- intentarlo
+  // siempre falla. Vamos directo al ingreso manual del apellido.
+  const corriendoComoAppNativa = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    // Fallback: input manual si el navegador no soporta voz
+  if (!SpeechRecognition || corriendoComoAppNativa) {
+    // Fallback: input manual (navegador sin soporte de voz, o app nativa)
     const apellido = prompt('Ingresá tu apellido:');
     if (apellido && apellido.trim()) {
       mostrarApellidoReconocido(apellido.trim().toUpperCase());
