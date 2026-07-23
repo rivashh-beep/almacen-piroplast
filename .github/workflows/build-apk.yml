@@ -3,7 +3,7 @@ name: Compilar APK Android
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # permite lanzarlo a mano desde la pestaña "Actions"
 
 jobs:
   build:
@@ -27,6 +27,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
+
+      - name: Reconstruir la firma de debug (fija, para poder actualizar la app sin conflictos)
+        run: base64 -d android/app/debug.keystore.base64 > android/app/debug.keystore
 
       - name: Instalar dependencias
         run: npm install
