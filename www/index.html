@@ -1147,6 +1147,8 @@ const BALANZA_PRODUCT_ID = 8963;
 
 let balanzaConectada = false;
 let leyendoBalanza = false;
+let callbackLecturaRegistrado = false;
+let resolverLecturaActual = null;
 const Serial = window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins.Serial : null;
 
 // En la versión empaquetada (Capacitor) no existe "recordar puerto" como en
@@ -1163,6 +1165,32 @@ async function intentarReconexionAutomatica() {
     return;
   }
   document.getElementById('balanza-estado-texto').textContent = 'Toque "Conectar Balanza" para iniciar.';
+}
+
+// Se llama una sola vez: registra el callback que el plugin dispara cada vez
+// que llega un dato nuevo por el puerto serie (en vez de estar preguntando
+// "¿ya llegó algo?" en un bucle, que puede perderse la respuesta si llega
+// justo entre una consulta y la siguiente).
+async function registrarCallbackLecturaSiHaceFalta() {
+  if (callbackLecturaRegistrado) return;
+  await Serial.registerReadRawCallback((message, error) => {
+    if (!resolverLecturaActual) return; // nadie esperando esta lectura ahora mismo
+    const resolver = resolverLecturaActual;
+    resolverLecturaActual = null;
+    if (error) {
+      resolver(new Uint8Array());
+      return;
+    }
+    if (message && message.data) {
+      const binario = atob(message.data);
+      const arr = new Uint8Array(binario.length);
+      for (let i = 0; i < binario.length; i++) arr[i] = binario.charCodeAt(i);
+      resolver(arr);
+    } else {
+      resolver(new Uint8Array());
+    }
+  });
+  callbackLecturaRegistrado = true;
 }
 
 async function iniciarEscuchaBalanza() {
@@ -1191,11 +1219,12 @@ async function iniciarEscuchaBalanza() {
       await Serial.openConnection({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 0 });
       balanzaConectada = true;
     }
+    await registrarCallbackLecturaSiHaceFalta();
     document.getElementById('btn-conectar-balanza').style.display = 'none';
     document.getElementById('balanza-estado-texto').textContent = 'Balanza conectada. Esperando peso estable...';
     leerPesoBalanza();
   } catch (err) {
-    document.getElementById('balanza-estado-texto').textContent = 'Error al conectar: ' + (err.message || err);
+    document.getElementById('balanza-estado-texto').textContent = 'Error al conectar: ' + (err && err.message ? err.message : JSON.stringify(err));
   }
 }
 
@@ -1213,7 +1242,7 @@ async function leerPesoBalanza() {
       // Enviar EXACTAMENTE un byte (ENQ = 0x05), sin CR ni LF
       await Serial.writeHexadecimal({ data: '05' });
 
-      const bytes = await leerConTimeout(800);
+      const bytes = await esperarLecturaConTimeout(800);
 
       if (bytes.length === 0) {
         // sin respuesta: reintentar
@@ -1249,38 +1278,25 @@ async function leerPesoBalanza() {
       document.getElementById('balanza-estado-texto').textContent = 'No se pudo leer el peso. Verifique la balanza e intente de nuevo.';
     }
   } catch (err) {
-    document.getElementById('balanza-estado-texto').textContent = 'Error de lectura: ' + (err.message || err);
+    document.getElementById('balanza-estado-texto').textContent = 'Error de lectura: ' + (err && err.message ? err.message : JSON.stringify(err));
   } finally {
     leyendoBalanza = false;
   }
 }
 
-// Espera hasta timeoutMs por una respuesta del plugin nativo.
-// El plugin devuelve los bytes crudos codificados en base64 (readRaw: true).
-function leerConTimeout(timeoutMs) {
-  return new Promise(async (resolve) => {
-    let resuelto = false;
-    const timer = setTimeout(() => {
-      if (!resuelto) { resuelto = true; resolve(new Uint8Array()); }
-    }, timeoutMs);
-    try {
-      const resp = await Serial.read({ readRaw: true });
-      if (resuelto) return;
-      resuelto = true;
-      clearTimeout(timer);
-      if (resp && resp.data) {
-        const binario = atob(resp.data);
-        const arr = new Uint8Array(binario.length);
-        for (let i = 0; i < binario.length; i++) arr[i] = binario.charCodeAt(i);
-        resolve(arr);
-      } else {
+// Espera hasta timeoutMs a que el callback de lectura entregue una respuesta.
+function esperarLecturaConTimeout(timeoutMs) {
+  return new Promise((resolve) => {
+    resolverLecturaActual = resolve;
+    setTimeout(() => {
+      if (resolverLecturaActual === resolve) {
+        resolverLecturaActual = null;
         resolve(new Uint8Array());
       }
-    } catch (e) {
-      if (!resuelto) { resuelto = true; clearTimeout(timer); resolve(new Uint8Array()); }
-    }
+    }, timeoutMs);
   });
 }
+
 
 function recibirPesoDesdeBalanza(gramos) {
   // Esta función se llamará cuando llegue el dato de la balanza RS-232
