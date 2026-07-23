@@ -445,6 +445,7 @@
       <button class="btn-foto" id="btn-microfono" onclick="iniciarReconocimientoVoz()">🎙️ Hablar</button>
       <button class="btn btn-confirmar" id="btn-confirmar-voz" onclick="confirmarOperador()" style="display:none; margin-top:12px;">✅ Confirmar y continuar</button>
       <button class="btn-repetir" id="btn-repetir-voz" onclick="iniciarReconocimientoVoz()" style="display:none; margin-top:8px;">🔄 Repetir</button>
+      <button class="btn-repetir" id="btn-manual-voz" onclick="ingresarApellidoManual()" style="margin-top:8px; background:transparent; border:1px solid #546e7a; color:#90a4ae;">⌨️ Ingresar apellido a mano</button>
 
       <button class="btn-volver" onclick="volverAlInicio()">◀ Volver al inicio</button>
     </div>
@@ -935,14 +936,22 @@ function detenerCamara() {
   if (reconocimiento) { try { reconocimiento.stop(); } catch(e){} }
 }
 
+function ingresarApellidoManual() {
+  const apellido = prompt('Ingresá tu apellido:');
+  if (apellido && apellido.trim()) {
+    mostrarApellidoReconocido(apellido.trim().toUpperCase());
+  }
+}
+
 function iniciarReconocimientoVoz() {
   // En la app empaquetada (Capacitor/Android), el WebView no tiene el
   // servicio de reconocimiento de voz de Google conectado -- intentarlo
-  // siempre falla. Vamos directo al ingreso manual del apellido.
-  const corriendoComoAppNativa = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  // siempre falla. Detectamos el WebView de Android por su user-agent
+  // (incluye "; wv)", marca que Chrome de escritorio/completo no tiene).
+  const esWebViewAndroid = /;\s?wv\)/.test(navigator.userAgent);
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition || corriendoComoAppNativa) {
+  if (!SpeechRecognition || esWebViewAndroid) {
     // Fallback: input manual (navegador sin soporte de voz, o app nativa)
     const apellido = prompt('Ingresá tu apellido:');
     if (apellido && apellido.trim()) {
