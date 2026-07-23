@@ -1216,7 +1216,10 @@ async function iniciarEscuchaBalanza() {
       }
       // 9600 baudios, 8 bits de datos, 1 bit de parada, sin paridad
       // (parity: 0 = ninguna, según UsbSerialPort de usb-serial-for-android)
-      await Serial.openConnection({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 0 });
+      // dtr/rts en true: el cable null-modem cruza también las líneas
+      // DTR<->DSR (pines 4-6) -- sin levantar DTR, muchos adaptadores
+      // USB-serie no habilitan la comunicación aunque el cableado esté ok.
+      await Serial.openConnection({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 0, dtr: true, rts: true });
       balanzaConectada = true;
     }
     await registrarCallbackLecturaSiHaceFalta();
