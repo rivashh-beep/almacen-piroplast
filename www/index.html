@@ -1253,23 +1253,35 @@ async function leerPesoBalanza() {
         continue;
       }
 
-      // WACK: peso inestable, la balanza pide espera
+      // WACK: peso inestable -- la balanza pide que reenviemos el ENQ
+      // (según el manual: ENQ -> WACK -> ENQ de nuevo -> STX+PESO+ETX+CRC)
       if (bytes.length === 1 && bytes[0] === 0x11) {
         document.getElementById('balanza-estado-texto').textContent = 'Peso inestable, esperando...';
-        await new Promise(r => setTimeout(r, 500));
-        continue;
+        continue; // reenvía ENQ ya, sin espera artificial
       }
 
-      // Trama válida: 0x02 + peso ASCII + 0x03 + checksum
+      // Trama válida: 0x02 + peso ASCII + 0x03 + checksum (XOR de STX..ETX)
       if (bytes[0] === 0x02) {
         const idxETX = bytes.indexOf(0x03);
-        if (idxETX > 0) {
-          const pesoStr = new TextDecoder().decode(bytes.slice(1, idxETX));
-          const peso = parseFloat(pesoStr);
-          if (!isNaN(peso)) {
-            recibirPesoDesdeBalanza(peso);
-            break;
+        if (idxETX > 0 && bytes.length > idxETX + 1) {
+          let xor = 0;
+          for (let i = 0; i <= idxETX; i++) xor ^= bytes[i];
+          const crcRecibido = bytes[idxETX + 1];
+
+          if (xor === crcRecibido) {
+            // Checksum correcto: confirmamos con ACK, como pide el protocolo
+            await Serial.writeHexadecimal({ data: '06' });
+            const pesoStr = new TextDecoder().decode(bytes.slice(1, idxETX));
+            const peso = parseFloat(pesoStr);
+            if (!isNaN(peso)) {
+              recibirPesoDesdeBalanza(peso);
+              break;
+            }
+          } else {
+            // Checksum incorrecto: pedimos reenvío con NACK
+            await Serial.writeHexadecimal({ data: '15' });
           }
+          continue;
         }
       }
 
