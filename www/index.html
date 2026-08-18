@@ -1132,13 +1132,29 @@ function activarEscuchaQR(inputId, callback) {
 // ============================================================
 // PASO 5: BALANZA RS-232 (Systel Flaier Plus) vía Web Serial API
 //
-// Protocolo confirmado con soporte técnico de Systel:
-//   - Comando: se envía un único byte $05 (ENQ), SIN CR ni LF.
-//     La detección de fin de trama en la balanza es por tiempo
-//     (silencio de ~5ms), no por caracteres de terminación.
-//   - Respuesta con peso estable: $02 + peso ASCII + $03 + checksum
-//   - Respuesta con peso inestable: un único byte $11 (WACK) —
-//     hay que reintentar hasta que el peso se estabilice.
+// ACTUALIZADO 18/08/2026: Systel informó que el manual público del
+// Flaier Plus está desactualizado. El comando $05 (ENQ) documentado
+// ahí NO es reconocido por esta unidad (se verificó exhaustivamente:
+// sin respuesta alguna, con byte único garantizado vía API de bajo
+// nivel, en dos PCs distintas). El protocolo real, verificado de
+// forma empírica y reproducible hoy con la balanza física, es:
+//
+//   - Comando: se envían DOS bytes $07 $07 (no un $05 único).
+//   - Respuesta: 7 bytes, SIN framing STX($02)/ETX($03):
+//       [5 dígitos ASCII del peso en GRAMOS, con ceros a la izq.]
+//       + $65 ('e' — función exacta no confirmada, posible
+//         indicador de estabilidad)
+//       + [checksum: XOR de los 6 bytes anteriores]
+//     Ej.: peso real 330 g -> ASCII "00330" + 0x65 + checksum
+//          peso real 1080 g -> ASCII "01080" + 0x65 + checksum
+//   - No se observó necesidad de responder con ACK/NACK: en todas
+//     las pruebas la balanza entregó la trama completa sin esperar
+//     confirmación de vuelta.
+//
+// PENDIENTE: pedirle a Systel confirmación por escrito de este
+// formato completo (en particular el significado del byte $65 y si
+// existe algún caso donde SÍ haga falta un ACK), ya que por ahora
+// se dedujo únicamente comparando 3 pesos de prueba.
 // ============================================================
 // VID/PID estándar del chip Prolific PL2303 (067B:2303 en hex = 1659:8963 en decimal).
 // Si tu adaptador específico reporta otro VID/PID, cambiálos acá.
@@ -1242,8 +1258,9 @@ async function leerPesoBalanza() {
     while (intentos < MAX_INTENTOS) {
       intentos++;
 
-      // Enviar EXACTAMENTE un byte (ENQ = 0x05), sin CR ni LF
-      await Serial.writeHexadecimal({ data: '05' });
+      // Enviar EXACTAMENTE dos bytes (07 07), protocolo real confirmado
+      // el 18/08/2026 -- ver comentario de cabecera de esta sección.
+      await Serial.writeHexadecimal({ data: '0707' });
 
       const bytes = await esperarLecturaConTimeout(800);
 
@@ -1253,39 +1270,26 @@ async function leerPesoBalanza() {
         continue;
       }
 
-      // WACK: peso inestable -- la balanza pide que reenviemos el ENQ
-      // (según el manual: ENQ -> WACK -> ENQ de nuevo -> STX+PESO+ETX+CRC)
-      if (bytes.length === 1 && bytes[0] === 0x11) {
-        document.getElementById('balanza-estado-texto').textContent = 'Peso inestable, esperando...';
-        continue; // reenvía ENQ ya, sin espera artificial
-      }
+      // Trama válida: 5 dígitos ASCII (peso en gramos) + 0x65 + checksum XOR
+      if (bytes.length === 7 && bytes[5] === 0x65) {
+        let xor = 0;
+        for (let i = 0; i < 6; i++) xor ^= bytes[i];
+        const checksumRecibido = bytes[6];
 
-      // Trama válida: 0x02 + peso ASCII + 0x03 + checksum (XOR de STX..ETX)
-      if (bytes[0] === 0x02) {
-        const idxETX = bytes.indexOf(0x03);
-        if (idxETX > 0 && bytes.length > idxETX + 1) {
-          let xor = 0;
-          for (let i = 0; i <= idxETX; i++) xor ^= bytes[i];
-          const crcRecibido = bytes[idxETX + 1];
-
-          if (xor === crcRecibido) {
-            // Checksum correcto: confirmamos con ACK, como pide el protocolo
-            await Serial.writeHexadecimal({ data: '06' });
-            const pesoStr = new TextDecoder().decode(bytes.slice(1, idxETX));
-            const peso = parseFloat(pesoStr);
-            if (!isNaN(peso)) {
-              recibirPesoDesdeBalanza(peso);
-              break;
-            }
-          } else {
-            // Checksum incorrecto: pedimos reenvío con NACK
-            await Serial.writeHexadecimal({ data: '15' });
+        if (xor === checksumRecibido) {
+          const pesoStr = new TextDecoder().decode(bytes.slice(0, 5));
+          const peso = parseInt(pesoStr, 10);
+          if (!isNaN(peso)) {
+            recibirPesoDesdeBalanza(peso);
+            break;
           }
-          continue;
         }
+        // Checksum incorrecto: no hay comando de reenvío confirmado
+        // para este protocolo todavía -- simplemente reintentamos.
+        continue;
       }
 
-      // cualquier otra respuesta (ej. error E5): reintentar
+      // cualquier otra respuesta (ej. error de formato tipo "E1t"): reintentar
       await new Promise(r => setTimeout(r, 300));
     }
 
