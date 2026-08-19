@@ -632,7 +632,7 @@
   </div><!-- /content -->
 
   <div class="footer">
-    Piroplast · Sistema de Gestión de Almacén · v2.0
+    Piroplast · Sistema de Gestión de Almacén · v3.0
     &nbsp;|&nbsp; <span id="reloj-footer"></span>
   </div>
 </div>
@@ -640,6 +640,7 @@
 <!-- Bridge de Capacitor + plugin de balanza RS-232 (empaquetado nativo Android) -->
 <script src="capacitor.js"></script>
 <script src="plugins/capacitor-serial.js"></script>
+<script src="plugins/capacitor-speech-recognition.js"></script>
 
 <script>
 // ============================================================
@@ -917,10 +918,9 @@ function volverAlInicio() {
 }
 
 // ============================================================
-// PASO 2: IDENTIFICACIÓN POR VOZ (Web Speech API)
-// Funciona en Chrome Android desde archivo local
+// PASO 2: IDENTIFICACIÓN POR VOZ (@capacitor-community/speech-recognition)
+// Ver comentario completo en iniciarReconocimientoVoz() más abajo.
 // ============================================================
-let reconocimiento = null;
 
 function iniciarCamara() {
   // Resetear UI de voz al entrar al paso
@@ -933,7 +933,8 @@ function iniciarCamara() {
 }
 
 function detenerCamara() {
-  if (reconocimiento) { try { reconocimiento.stop(); } catch(e){} }
+  const SpeechRecognition = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition;
+  if (SpeechRecognition) { SpeechRecognition.stop().catch(() => {}); }
 }
 
 function ingresarApellidoManual() {
@@ -943,28 +944,29 @@ function ingresarApellidoManual() {
   }
 }
 
-function iniciarReconocimientoVoz() {
-  // En la app empaquetada (Capacitor/Android), el WebView no tiene el
-  // servicio de reconocimiento de voz de Google conectado -- intentarlo
-  // siempre falla. Detectamos el WebView de Android por su user-agent
-  // (incluye "; wv)", marca que Chrome de escritorio/completo no tiene).
-  const esWebViewAndroid = /;\s?wv\)/.test(navigator.userAgent);
+// ACTUALIZADO 19/08/2026: se reemplazó la Web Speech API del navegador
+// (window.SpeechRecognition) por el plugin @capacitor-community/speech-recognition.
+// Motivo: la Web Speech API depende de un servicio de red de Google atado a
+// Chrome como navegador completo -- el WebView de Android que usa la app
+// empaquetada (Capacitor) no tiene acceso a ese servicio, aunque el permiso
+// de micrófono esté correctamente concedido (esto se confirmó revisando
+// tanto el WebView como MainActivity.java: Capacitor ya otorga el permiso
+// de audio solo, el problema es la falta de acceso al servicio en sí).
+//
+// El plugin resuelve esto usando el reconocedor de voz NATIVO de Android
+// (android.speech.SpeechRecognizer) en la app empaquetada, y su propia
+// implementación web (que sí envuelve la Web Speech API del navegador) en
+// entornos de navegador normal (ej. la versión en GitHub Pages) -- por eso
+// ya no hace falta el chequeo de "esWebViewAndroid": un solo código sirve
+// para los dos casos.
+async function iniciarReconocimientoVoz() {
+  const SpeechRecognition = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition;
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition || esWebViewAndroid) {
-    // Fallback: input manual (navegador sin soporte de voz, o app nativa)
-    const apellido = prompt('Ingresá tu apellido:');
-    if (apellido && apellido.trim()) {
-      mostrarApellidoReconocido(apellido.trim().toUpperCase());
-    }
+  if (!SpeechRecognition) {
+    // Plugin no disponible por algún motivo: ingreso manual como respaldo.
+    ingresarApellidoManual();
     return;
   }
-
-  reconocimiento = new SpeechRecognition();
-  reconocimiento.lang = 'es-AR';
-  reconocimiento.continuous = false;
-  reconocimiento.interimResults = false;
-  reconocimiento.maxAlternatives = 1;
 
   // UI: escuchando
   document.getElementById('voz-icono').textContent = '🔴';
@@ -974,28 +976,43 @@ function iniciarReconocimientoVoz() {
   document.getElementById('btn-confirmar-voz').style.display = 'none';
   document.getElementById('btn-repetir-voz').style.display = 'none';
 
-  reconocimiento.onresult = function(e) {
-    const apellido = e.results[0][0].transcript.trim().toUpperCase();
-    mostrarApellidoReconocido(apellido);
-  };
-
-  reconocimiento.onerror = function(e) {
+  const volverAEsperar = (mensaje) => {
     document.getElementById('voz-icono').textContent = '🎙️';
-    document.getElementById('voz-estado').textContent = 'No se escuchó nada. Intentá de nuevo.';
+    document.getElementById('voz-estado').textContent = mensaje;
     document.getElementById('voz-resultado').textContent = '—';
     document.getElementById('btn-microfono').style.display = 'block';
   };
 
-  reconocimiento.onend = function() {
-    if (document.getElementById('voz-resultado').textContent === '...') {
-      document.getElementById('voz-icono').textContent = '🎙️';
-      document.getElementById('voz-estado').textContent = 'No se detectó voz. Intentá de nuevo.';
-      document.getElementById('voz-resultado').textContent = '—';
-      document.getElementById('btn-microfono').style.display = 'block';
+  try {
+    const disponibilidad = await SpeechRecognition.available();
+    if (!disponibilidad.available) {
+      volverAEsperar('Reconocimiento de voz no disponible en este dispositivo.');
+      return;
     }
-  };
 
-  reconocimiento.start();
+    const permisos = await SpeechRecognition.requestPermissions();
+    if (permisos.speechRecognition !== 'granted') {
+      volverAEsperar('Permiso de micrófono denegado. Usá el ingreso manual.');
+      return;
+    }
+
+    const resultado = await SpeechRecognition.start({
+      language: 'es-AR',
+      maxResults: 1,
+      partialResults: false,
+      popup: false
+    });
+
+    const texto = resultado && resultado.matches && resultado.matches[0];
+    if (!texto) {
+      volverAEsperar('No se detectó voz. Intentá de nuevo.');
+      return;
+    }
+
+    mostrarApellidoReconocido(texto.trim().toUpperCase());
+  } catch (err) {
+    volverAEsperar('Error: ' + (err && err.message ? err.message : 'no se pudo reconocer.'));
+  }
 }
 
 function mostrarApellidoReconocido(apellido) {
@@ -1087,6 +1104,18 @@ function guardarQRInsumo(codigo) {
       : 'Vuelque el material en el contenedor y colóquelo sobre la balanza.';
     document.getElementById('instruccion-peso').textContent = instruccion;
     irAPaso(5);
+
+    // Si la balanza ya estaba conectada desde una operación anterior (misma
+    // sesión de la app), el botón "Conectar Balanza" quedó oculto y no hay
+    // forma de volver a dispararlo con un toque -- iniciamos la lectura
+    // automáticamente, ya que el puerto USB sigue abierto y no hace falta
+    // volver a pedir permiso.
+    if (balanzaConectada) {
+      document.getElementById('balanza-valor').textContent = '- - -';
+      document.getElementById('balanza-estado').className = 'balanza-estado esperando';
+      document.getElementById('balanza-estado-texto').textContent = 'Esperando peso estable...';
+      leerPesoBalanza();
+    }
   }, 800);
 }
 
@@ -1247,6 +1276,15 @@ async function iniciarEscuchaBalanza() {
   }
 }
 
+// Vuelve a mostrar el botón de balanza como vía de reintento manual, para
+// cuando la lectura automática (al llegar al paso 5 en una 2da operación
+// o posterior) falla y el operador necesita disparar un nuevo intento a mano.
+function mostrarBotonReintentoBalanza() {
+  const boton = document.getElementById('btn-conectar-balanza');
+  boton.style.display = 'block';
+  boton.textContent = '🔌 Reintentar Lectura';
+}
+
 async function leerPesoBalanza() {
   if (leyendoBalanza) return; // evita lecturas superpuestas
   leyendoBalanza = true;
@@ -1294,10 +1332,12 @@ async function leerPesoBalanza() {
     }
 
     if (intentos >= MAX_INTENTOS) {
-      document.getElementById('balanza-estado-texto').textContent = 'No se pudo leer el peso. Verifique la balanza e intente de nuevo.';
+      document.getElementById('balanza-estado-texto').textContent = 'No se pudo leer el peso. Toque "Reintentar lectura" o verifique la balanza.';
+      mostrarBotonReintentoBalanza();
     }
   } catch (err) {
     document.getElementById('balanza-estado-texto').textContent = 'Error de lectura: ' + (err && err.message ? err.message : JSON.stringify(err));
+    mostrarBotonReintentoBalanza();
   } finally {
     leyendoBalanza = false;
   }
