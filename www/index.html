@@ -37,7 +37,7 @@
 
     .container {
       width: 100%;
-      max-width: 644px;
+      max-width: 1400px;
       background: var(--blanco);
       border-radius: 16px;
       box-shadow: 0 6px 24px rgba(0,0,0,0.12);
@@ -84,7 +84,7 @@
       margin: 16px 24px 0;
       padding: 6px 14px;
       border-radius: 20px;
-      font-size: 0.8rem;
+      font-size: 1rem;
       font-weight: 700;
       letter-spacing: 0.5px;
       text-transform: uppercase;
@@ -156,7 +156,7 @@
     .btn-egreso  { background: linear-gradient(135deg, #a71d2a, #dc3545); box-shadow: 0 4px 12px rgba(220,53,69,0.35); }
     .btn-confirmar { background: linear-gradient(135deg, #1565c0, #1976d2); box-shadow: 0 4px 12px rgba(21,101,192,0.35); font-size: 1.1rem; padding: 18px; }
     .btn-reiniciar { background: linear-gradient(135deg, #37474f, #546e7a); font-size: 1rem; padding: 16px; margin-top: 16px; }
-    .btn-volver { background: none; color: #607d8b; border: 1.5px solid var(--borde); font-size: 0.9rem; padding: 10px; border-radius: 8px; width: 100%; cursor: pointer; margin-top: 12px; font-weight: 600; }
+    .btn-volver { background: none; color: #607d8b; border: 1.5px solid var(--borde); font-size: 1rem; padding: 10px; border-radius: 8px; width: 100%; cursor: pointer; margin-top: 12px; font-weight: 600; }
     .btn-icono { font-size: 1.5rem; }
 
     /* CÁMARA */
@@ -217,7 +217,7 @@
       color: #607d8b;
       border: 1.5px solid var(--borde);
       border-radius: 8px;
-      font-size: 0.9rem;
+      font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
       display: none;
@@ -290,7 +290,7 @@
       margin-top: 14px;
       padding: 6px 14px;
       border-radius: 20px;
-      font-size: 0.8rem;
+      font-size: 1rem;
       font-weight: 600;
     }
     .balanza-estado.esperando { background: #263445; color: #90a4ae; }
@@ -316,7 +316,7 @@
     .insumo-card.visible { display: block; }
     .insumo-card-label { font-size: 0.75rem; color: #607d8b; text-transform: uppercase; letter-spacing: 0.5px; }
     .insumo-card-nombre { font-size: 1.1rem; font-weight: 700; color: var(--texto); margin-top: 2px; }
-    .insumo-card-codigo { font-size: 0.85rem; color: #78909c; margin-top: 2px; }
+    .insumo-card-codigo { font-size: 1rem; color: #78909c; margin-top: 2px; }
 
     /* RESULTADO FINAL */
     .resultado-exito {
@@ -432,20 +432,29 @@
     <!-- ===== PASO 2: IDENTIFICACIÓN POR VOZ ===== -->
     <div id="paso2" class="step">
       <h2>Identificación del Operador</h2>
-      <p class="subtitulo">Tocá el micrófono y decí tu <strong>apellido</strong> claramente.</p>
+      <p class="subtitulo">Escaneá tu código QR en la <strong>pizarra de operadores</strong>.</p>
 
-      <!-- Display del apellido reconocido -->
-      <div style="background:#1a2533; border-radius:12px; padding:28px 20px; text-align:center; margin-bottom:20px;">
-        <div id="voz-icono" style="font-size:3.5rem; margin-bottom:12px;">🎙️</div>
-        <div id="voz-resultado" style="color:#4caf50; font-size:2rem; font-weight:700; min-height:48px; letter-spacing:1px;">—</div>
-        <div id="voz-estado" style="color:#90a4ae; font-size:0.85rem; margin-top:10px;">Esperando...</div>
+      <div class="esperando-qr">
+        <div class="qr-icono">⬛</div>
+        <p>Apuntá el lector a tu código en la pizarra</p>
       </div>
 
-      <!-- Botones -->
-      <button class="btn-foto" id="btn-microfono" onclick="iniciarReconocimientoVoz()">🎙️ Hablar</button>
-      <button class="btn btn-confirmar" id="btn-confirmar-voz" onclick="confirmarOperador()" style="display:none; margin-top:12px;">✅ Confirmar y continuar</button>
-      <button class="btn-repetir" id="btn-repetir-voz" onclick="iniciarReconocimientoVoz()" style="display:none; margin-top:8px;">🔄 Repetir</button>
-      <button class="btn-repetir" id="btn-manual-voz" onclick="ingresarApellidoManual()" style="margin-top:8px; background:transparent; border:1px solid #546e7a; color:#90a4ae;">⌨️ Ingresar apellido a mano</button>
+      <div class="input-wrapper" style="margin-top:16px;">
+        <span class="icono-input">🪪</span>
+        <input type="text"
+               id="input-qr-operador"
+               placeholder="Esperando código QR..."
+               inputmode="none"
+               autocomplete="off">
+      </div>
+
+      <div id="operador-card" class="insumo-card">
+        <div class="insumo-card-label">Operador identificado</div>
+        <div class="insumo-card-nombre" id="operador-nombre">—</div>
+      </div>
+
+      <!-- Respaldo manual: por si el lector falla o el operador todavía no tiene código impreso -->
+      <button class="btn-repetir" id="btn-manual-operador" style="display:block; margin-top:8px; background:transparent; border:1.5px solid var(--borde); color:#607d8b;" onclick="ingresarApellidoManual()">⌨️ Ingresar apellido a mano</button>
 
       <button class="btn-volver" onclick="volverAlInicio()">◀ Volver al inicio</button>
     </div>
@@ -513,7 +522,24 @@
         <div class="insumo-card-codigo" id="insumo-codigo">—</div>
       </div>
 
-      <button class="btn-volver" onclick="irAPaso(3)">◀ Volver</button>
+      <!-- NUEVO v4 (Punto 2 del informe): solo para Ingreso. Permite cargar
+           remitos de varias bolsas/unidades sin pesar cada una por separado. -->
+      <div id="bloque-cantidad" class="insumo-card" style="display:none;">
+        <div class="insumo-card-label">¿Cuántas bolsas/unidades está ingresando?</div>
+        <div class="input-wrapper" style="margin-top:8px; margin-bottom:0;">
+          <span class="icono-input">🔢</span>
+          <input type="number"
+                 id="input-cantidad"
+                 value="1"
+                 min="1"
+                 step="1"
+                 inputmode="numeric"
+                 style="padding-left:46px;">
+        </div>
+        <button class="btn btn-confirmar" style="margin-top:12px;padding:14px;" onclick="confirmarCantidadYAvanzar()">Continuar ➔</button>
+      </div>
+
+      <button class="btn-volver" onclick="volverDesdePaso4()">◀ Volver</button>
     </div>
 
     <!-- ===== PASO 5: BALANZA ===== -->
@@ -535,6 +561,17 @@
         </div>
       </div>
 
+      <!-- NUEVO v4 (Punto 2 del informe): solo Ingreso. Muestra peso × cantidad
+           = total antes de agregar el ítem a la lista del remito. -->
+      <div id="vista-previa-cantidad" class="insumo-card" style="display:none;">
+        <div class="resultado-detalle" style="margin:0 0 12px;">
+          <div class="resultado-fila"><span>Peso unitario</span><span id="preview-peso-unitario">-</span></div>
+          <div class="resultado-fila"><span>Cantidad</span><span id="preview-cantidad">-</span></div>
+          <div class="resultado-fila"><span>Total</span><span id="preview-total">-</span></div>
+        </div>
+        <button class="btn btn-confirmar" onclick="agregarItemAlCarrito()">➕ Agregar a la lista</button>
+      </div>
+
       <!-- Input oculto para recibir peso (balanza RS-232 enviará el dato aquí) -->
       <input type="number"
              id="input-peso"
@@ -544,7 +581,7 @@
 
       <!-- MODO DEMO: mientras la balanza no esté conectada -->
       <div id="bloque-demo-balanza" style="background:#fff8e1;border:1.5px dashed #f59f00;border-radius:10px;padding:14px;margin-bottom:16px;">
-        <p style="font-size:0.82rem;color:#7d5a00;margin-bottom:10px;">⚠️ <strong>Modo demo</strong> — Balanza RS-232 no conectada aún. Ingresá el peso manualmente para continuar.</p>
+        <p style="font-size:1rem;color:#7d5a00;margin-bottom:10px;">⚠️ <strong>Modo demo</strong> — Balanza RS-232 no conectada aún. Ingresá el peso manualmente para continuar.</p>
         <div class="input-wrapper" style="margin-bottom:0;">
           <span class="icono-input">⚖️</span>
           <input type="number"
@@ -562,6 +599,28 @@
       <button class="btn-volver" onclick="irAPaso(4)">◀ Volver</button>
     </div>
 
+    <!-- ===== NUEVO v4 (Punto 3 del informe): ¿OTRO MATERIAL? — solo Ingreso ===== -->
+    <div id="pasoOtroMaterial" class="step">
+      <h2>¿Otro material?</h2>
+      <p class="subtitulo">Llevás <strong id="resumen-carrito-cantidad">0</strong> material(es) cargado(s) en este remito.</p>
+      <div class="btn-grupo">
+        <button class="btn btn-ingreso" onclick="agregarOtroMaterial()">➕ Sí, escanear otro</button>
+        <button class="btn btn-confirmar" onclick="terminarCarrito()">✅ No, continuar</button>
+      </div>
+    </div>
+
+    <!-- ===== NUEVO v4 (Punto 3 del informe): CONFIRMACIÓN DEL REMITO — solo Ingreso ===== -->
+    <div id="pasoConfirmarCarrito" class="step">
+      <h2>Confirmar remito</h2>
+      <p class="subtitulo">Revisá la lista antes de enviar. Remito: <strong id="confirmar-carrito-remito"></strong></p>
+      <div class="resultado-detalle" id="lista-carrito"></div>
+      <div class="resultado-fila" style="margin-top:8px; font-weight:700;">
+        <span>Total</span><span id="total-carrito">0 g</span>
+      </div>
+      <button class="btn btn-confirmar" style="margin-top:16px;" onclick="enviarCarritoADropbox()">✅ Confirmar y enviar</button>
+      <button class="btn-volver" onclick="quitarUltimoItemCarrito()">◀ Corregir último ítem</button>
+    </div>
+
     <!-- ===== PASO 6: RESULTADO ===== -->
     <div id="paso6" class="step">
 
@@ -571,7 +630,7 @@
           <div class="resultado-icono">✅</div>
           <div class="resultado-titulo">¡Operación Registrada!</div>
           <div class="resultado-detalle" id="detalle-transaccion"></div>
-          <div id="estado-dropbox" style="font-size:0.85rem;color:#607d8b;margin-top:8px;"></div>
+          <div id="estado-dropbox" style="font-size:1rem;color:#607d8b;margin-top:8px;"></div>
         </div>
       </div>
 
@@ -632,7 +691,7 @@
   </div><!-- /content -->
 
   <div class="footer">
-    Piroplast · Sistema de Gestión de Almacén · v3.0
+    Piroplast · Sistema de Gestión de Almacén · v4.0
     &nbsp;|&nbsp; <span id="reloj-footer"></span>
   </div>
 </div>
@@ -730,6 +789,14 @@ const PADRON_INSUMOS = {
   "PI9050217":     { nombre: "Pigmento Azul PEAD",                 descripcion: "BERMA" },
 };
 
+// Padrón de operadores para el QR de la pizarra (código→apellido).
+// PENDIENTE: todavía no hay códigos QR reales de operadores -- completar
+// acá una vez que se impriman y peguen en la pizarra fija de la pared
+// (ver comentario en la sección "PASO 2" más abajo).
+const PADRON_OPERADORES = {
+  // "OP-EJEMPLO": "GONZALEZ",
+};
+
 // Stock local — todos en 0 para inicio de operaciones
 // FASE 2: se actualizará en tiempo real desde Dropbox
 const STOCK_LOCAL = {
@@ -815,18 +882,21 @@ const STOCK_LOCAL = {
 // ============================================================
 let transaccion = {
   tipo: '',
-  foto_base64: '',
-  id_operador: 'OP-' + Date.now(), // placeholder hasta reconocimiento real
+  id_operador: '',
   ot: '',
   remito: '',
   id_qr: '',
   nombre_insumo: '',
-  peso: 0,
+  cantidad: 1,     // NUEVO v4: cantidad de bolsas/unidades (solo Ingreso, ver Punto 2 del informe)
+  peso: 0,         // peso unitario leído de la balanza
   timestamp: ''
 };
 
-let streamCamara = null;
-let fotoTomada = false;
+// NUEVO v4 (Punto 3 del informe): lista de materiales del remito actual,
+// solo se usa en el flujo de Ingreso ("carrito"). Cada ítem:
+// { id_qr, nombre_insumo, peso_unitario, cantidad, subtotal }
+let carrito = [];
+
 let qrBuffer = '';
 let qrTimeout = null;
 
@@ -850,7 +920,11 @@ function irAPaso(n) {
   actualizarIndicador(n);
 
   // Foco inteligente según paso
-  if (n === 2) iniciarCamara();
+  if (n === 2) {
+    document.getElementById('input-qr-operador').value = '';
+    document.getElementById('operador-card').classList.remove('visible');
+    activarEscuchaQR('input-qr-operador', guardarQROperador);
+  }
   if (n === 3) {
     if (transaccion.tipo === 'INGRESO') {
       setTimeout(() => document.getElementById('input-remito').focus(), 200);
@@ -864,9 +938,11 @@ function irAPaso(n) {
   if (n === 4) {
     document.getElementById('input-qr').value = '';
     document.getElementById('insumo-card').classList.remove('visible');
+    document.getElementById('bloque-cantidad').style.display = 'none';
     activarEscuchaQR('input-qr', guardarQRInsumo);
   }
   if (n === 5) {
+    document.getElementById('vista-previa-cantidad').style.display = 'none';
     // Intenta reconectar solo si el navegador ya autorizó la balanza antes.
     // Si es la primera vez, el operador debe tocar "Conectar Balanza".
     intentarReconexionAutomatica();
@@ -909,128 +985,53 @@ function seleccionarFlujo(tipo) {
 }
 
 function volverAlInicio() {
-  detenerCamara();
-  transaccion = { tipo:'', foto_base64:'', id_operador:'', ot:'', remito:'', id_qr:'', nombre_insumo:'', peso:0, timestamp:'' };
-  fotoTomada = false;
+  transaccion = { tipo:'', id_operador:'', ot:'', remito:'', id_qr:'', nombre_insumo:'', cantidad:1, peso:0, timestamp:'' };
+  carrito = [];
   irAPaso(1);
   document.getElementById('step-indicator').classList.remove('visible');
   document.getElementById('tipo-badge').style.display = 'none';
 }
 
 // ============================================================
-// PASO 2: IDENTIFICACIÓN POR VOZ (@capacitor-community/speech-recognition)
-// Ver comentario completo en iniciarReconocimientoVoz() más abajo.
+// PASO 2: IDENTIFICACIÓN DEL OPERADOR VÍA QR DE PIZARRA
+//
+// ACTUALIZADO 20/08/2026 (v4, Punto 1 del informe): se reemplazó el
+// reconocimiento de voz por el lector QR inalámbrico (el mismo que ya se
+// usa para insumos, ver activarEscuchaQR() más abajo). Motivo: la planta
+// es ruidosa y eso perjudicaba el reconocimiento de voz; además ya existe
+// infraestructura de escaneo QR probada. El lector funciona como teclado
+// emulado (HID) -- no se usa la cámara de la tablet.
+//
+// Mecanismo: hay una pizarra fija en la pared con el QR de cada operador
+// impreso; cada operador escanea su propio código desde ahí. Con esto,
+// técnicamente cualquiera podría escanear el código de otra persona, pero
+// la voz tampoco era una autenticación real -- se prioriza la practicidad,
+// trade-off aceptado.
+//
+// PENDIENTE: todavía no hay códigos QR reales de operadores -- completar
+// PADRON_OPERADORES (más arriba) con el mapeo código→apellido una vez que
+// estén impresos y pegados en la pizarra.
 // ============================================================
 
-function iniciarCamara() {
-  // Resetear UI de voz al entrar al paso
-  document.getElementById('voz-resultado').textContent = '—';
-  document.getElementById('voz-estado').textContent = 'Tocá el botón y decí tu apellido';
-  document.getElementById('voz-icono').textContent = '🎙️';
-  document.getElementById('btn-microfono').style.display = 'block';
-  document.getElementById('btn-confirmar-voz').style.display = 'none';
-  document.getElementById('btn-repetir-voz').style.display = 'none';
-}
+function guardarQROperador(codigo) {
+  const nombre = PADRON_OPERADORES[codigo];
+  transaccion.id_operador = nombre || codigo;
 
-function detenerCamara() {
-  const SpeechRecognition = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition;
-  if (SpeechRecognition) { SpeechRecognition.stop().catch(() => {}); }
+  document.getElementById('input-qr-operador').value = codigo;
+  document.getElementById('operador-nombre').textContent =
+    nombre || ('Código: ' + codigo + ' (no está en el padrón)');
+  document.getElementById('operador-card').classList.add('visible');
+
+  // Avanza automático, mismo patrón que guardarQRInsumo()
+  setTimeout(avanzarDesdeFoto, 700);
 }
 
 function ingresarApellidoManual() {
   const apellido = prompt('Ingresá tu apellido:');
   if (apellido && apellido.trim()) {
-    mostrarApellidoReconocido(apellido.trim().toUpperCase());
+    transaccion.id_operador = apellido.trim().toUpperCase();
+    avanzarDesdeFoto();
   }
-}
-
-// ACTUALIZADO 19/08/2026: se reemplazó la Web Speech API del navegador
-// (window.SpeechRecognition) por el plugin @capacitor-community/speech-recognition.
-// Motivo: la Web Speech API depende de un servicio de red de Google atado a
-// Chrome como navegador completo -- el WebView de Android que usa la app
-// empaquetada (Capacitor) no tiene acceso a ese servicio, aunque el permiso
-// de micrófono esté correctamente concedido (esto se confirmó revisando
-// tanto el WebView como MainActivity.java: Capacitor ya otorga el permiso
-// de audio solo, el problema es la falta de acceso al servicio en sí).
-//
-// El plugin resuelve esto usando el reconocedor de voz NATIVO de Android
-// (android.speech.SpeechRecognizer) en la app empaquetada, y su propia
-// implementación web (que sí envuelve la Web Speech API del navegador) en
-// entornos de navegador normal (ej. la versión en GitHub Pages) -- por eso
-// ya no hace falta el chequeo de "esWebViewAndroid": un solo código sirve
-// para los dos casos.
-async function iniciarReconocimientoVoz() {
-  const SpeechRecognition = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition;
-
-  if (!SpeechRecognition) {
-    // Plugin no disponible por algún motivo: ingreso manual como respaldo.
-    ingresarApellidoManual();
-    return;
-  }
-
-  // UI: escuchando
-  document.getElementById('voz-icono').textContent = '🔴';
-  document.getElementById('voz-estado').textContent = 'Escuchando... decí tu apellido';
-  document.getElementById('voz-resultado').textContent = '...';
-  document.getElementById('btn-microfono').style.display = 'none';
-  document.getElementById('btn-confirmar-voz').style.display = 'none';
-  document.getElementById('btn-repetir-voz').style.display = 'none';
-
-  const volverAEsperar = (mensaje) => {
-    document.getElementById('voz-icono').textContent = '🎙️';
-    document.getElementById('voz-estado').textContent = mensaje;
-    document.getElementById('voz-resultado').textContent = '—';
-    document.getElementById('btn-microfono').style.display = 'block';
-  };
-
-  try {
-    const disponibilidad = await SpeechRecognition.available();
-    if (!disponibilidad.available) {
-      volverAEsperar('Reconocimiento de voz no disponible en este dispositivo.');
-      return;
-    }
-
-    const permisos = await SpeechRecognition.requestPermissions();
-    if (permisos.speechRecognition !== 'granted') {
-      volverAEsperar('Permiso de micrófono denegado. Usá el ingreso manual.');
-      return;
-    }
-
-    const resultado = await SpeechRecognition.start({
-      language: 'es-AR',
-      maxResults: 1,
-      partialResults: false,
-      popup: false
-    });
-
-    const texto = resultado && resultado.matches && resultado.matches[0];
-    if (!texto) {
-      volverAEsperar('No se detectó voz. Intentá de nuevo.');
-      return;
-    }
-
-    mostrarApellidoReconocido(texto.trim().toUpperCase());
-  } catch (err) {
-    volverAEsperar('Error: ' + (err && err.message ? err.message : 'no se pudo reconocer.'));
-  }
-}
-
-function mostrarApellidoReconocido(apellido) {
-  // Tomar solo la primera palabra (por si dice nombre y apellido)
-  const soloApellido = apellido.split(' ')[0];
-  transaccion.id_operador = soloApellido;
-
-  document.getElementById('voz-resultado').textContent = soloApellido;
-  document.getElementById('voz-icono').textContent = '✅';
-  document.getElementById('voz-estado').textContent = '¿Es correcto?';
-  document.getElementById('btn-microfono').style.display = 'none';
-  document.getElementById('btn-confirmar-voz').style.display = 'block';
-  document.getElementById('btn-repetir-voz').style.display = 'block';
-}
-
-function confirmarOperador() {
-  if (!transaccion.id_operador) return;
-  avanzarDesdeFoto();
 }
 
 function avanzarDesdeFoto() {
@@ -1060,6 +1061,7 @@ function guardarRemito() {
   }
   transaccion.remito = val;
   transaccion.ot = 'INGRESO_STOCK';
+  carrito = []; // nuevo remito: arrancamos la lista de materiales de cero (Punto 3)
   irAPaso(4);
 }
 
@@ -1089,34 +1091,63 @@ function guardarQRInsumo(codigo) {
     transaccion.nombre_insumo = insumo.nombre;
     document.getElementById('insumo-nombre').textContent = insumo.nombre;
     document.getElementById('insumo-codigo').textContent = codigo + ' · ' + insumo.descripcion;
-    document.getElementById('insumo-card').classList.add('visible');
   } else {
     transaccion.nombre_insumo = codigo;
     document.getElementById('insumo-nombre').textContent = 'Código: ' + codigo;
     document.getElementById('insumo-codigo').textContent = 'No encontrado en padrón local';
-    document.getElementById('insumo-card').classList.add('visible');
+  }
+  document.getElementById('insumo-card').classList.add('visible');
+
+  // NUEVO v4 (Punto 2 del informe): en Ingreso preguntamos cantidad de
+  // bolsas/unidades ANTES de pesar, para mostrar la vista previa peso ×
+  // cantidad = total antes de confirmar. El operador avanza a mano con
+  // "Continuar" (ver confirmarCantidadYAvanzar()).
+  if (transaccion.tipo === 'INGRESO') {
+    document.getElementById('input-cantidad').value = 1;
+    document.getElementById('bloque-cantidad').style.display = 'block';
+    return;
   }
 
-  // Avanzar automáticamente
-  setTimeout(() => {
-    const instruccion = transaccion.tipo === 'EGRESO'
-      ? 'Retire los gramos del contenedor y colóquelos sobre la balanza.'
-      : 'Vuelque el material en el contenedor y colóquelo sobre la balanza.';
-    document.getElementById('instruccion-peso').textContent = instruccion;
-    irAPaso(5);
+  // Egreso: sin cambios respecto a v3, siempre un solo ítem, avanza automático
+  transaccion.cantidad = 1;
+  setTimeout(avanzarAPesoDesdeInsumo, 800);
+}
 
-    // Si la balanza ya estaba conectada desde una operación anterior (misma
-    // sesión de la app), el botón "Conectar Balanza" quedó oculto y no hay
-    // forma de volver a dispararlo con un toque -- iniciamos la lectura
-    // automáticamente, ya que el puerto USB sigue abierto y no hace falta
-    // volver a pedir permiso.
-    if (balanzaConectada) {
-      document.getElementById('balanza-valor').textContent = '- - -';
-      document.getElementById('balanza-estado').className = 'balanza-estado esperando';
-      document.getElementById('balanza-estado-texto').textContent = 'Esperando peso estable...';
-      leerPesoBalanza();
-    }
-  }, 800);
+function confirmarCantidadYAvanzar() {
+  const val = parseInt(document.getElementById('input-cantidad').value, 10);
+  transaccion.cantidad = (!val || val < 1) ? 1 : val;
+  document.getElementById('bloque-cantidad').style.display = 'none';
+  avanzarAPesoDesdeInsumo();
+}
+
+function avanzarAPesoDesdeInsumo() {
+  const instruccion = transaccion.tipo === 'EGRESO'
+    ? 'Retire los gramos del contenedor y colóquelos sobre la balanza.'
+    : 'Vuelque el material en el contenedor y colóquelo sobre la balanza.';
+  document.getElementById('instruccion-peso').textContent = instruccion;
+  irAPaso(5);
+
+  // Si la balanza ya estaba conectada desde una operación anterior (misma
+  // sesión de la app), el botón "Conectar Balanza" quedó oculto y no hay
+  // forma de volver a dispararlo con un toque -- iniciamos la lectura
+  // automáticamente, ya que el puerto USB sigue abierto y no hace falta
+  // volver a pedir permiso.
+  if (balanzaConectada) {
+    document.getElementById('balanza-valor').textContent = '- - -';
+    document.getElementById('balanza-estado').className = 'balanza-estado esperando';
+    document.getElementById('balanza-estado-texto').textContent = 'Esperando peso estable...';
+    leerPesoBalanza();
+  }
+}
+
+function volverDesdePaso4() {
+  // Si ya hay ítems cargados en el carrito de este remito, "Volver" debe
+  // llevar a la pregunta de otro material, no reiniciar el remito entero.
+  if (transaccion.tipo === 'INGRESO' && carrito.length > 0) {
+    mostrarPasoOtroMaterial();
+  } else {
+    irAPaso(3);
+  }
 }
 
 // ============================================================
@@ -1366,8 +1397,150 @@ function recibirPesoDesdeBalanza(gramos) {
   document.getElementById('balanza-estado-texto').textContent = 'Peso recibido';
   document.getElementById('bloque-demo-balanza').style.display = 'none';
 
-  // Avanzar automáticamente
+  // NUEVO v4 (Punto 2/3): en Ingreso mostramos la vista previa peso × cantidad
+  // y esperamos que el operador confirme "Agregar a la lista" (carrito).
+  if (transaccion.tipo === 'INGRESO') {
+    mostrarVistaPreviaCantidad();
+    return;
+  }
+
+  // Egreso: sin cambios, un solo ítem, avanza automático
   setTimeout(procesarTransaccionFinal, 1000);
+}
+
+function mostrarVistaPreviaCantidad() {
+  const cantidad = transaccion.cantidad || 1;
+  const total = transaccion.peso * cantidad;
+  document.getElementById('preview-peso-unitario').textContent = transaccion.peso.toFixed(2) + ' g';
+  document.getElementById('preview-cantidad').textContent = cantidad;
+  document.getElementById('preview-total').textContent = total.toFixed(2) + ' g';
+  document.getElementById('vista-previa-cantidad').style.display = 'block';
+}
+
+// ============================================================
+// CARRITO DE MATERIALES (solo Ingreso) — Punto 3 del informe v4
+// ============================================================
+function agregarItemAlCarrito() {
+  const pesoUnitario = transaccion.peso;
+  const cantidad = transaccion.cantidad || 1;
+  carrito.push({
+    id_qr: transaccion.id_qr,
+    nombre_insumo: transaccion.nombre_insumo,
+    peso_unitario: pesoUnitario,
+    cantidad: cantidad,
+    subtotal: pesoUnitario * cantidad
+  });
+  document.getElementById('vista-previa-cantidad').style.display = 'none';
+  mostrarPasoOtroMaterial();
+}
+
+function mostrarPasoOtroMaterial() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('pasoOtroMaterial').classList.add('active');
+  document.getElementById('resumen-carrito-cantidad').textContent = carrito.length;
+}
+
+function agregarOtroMaterial() {
+  // Limpiar el material actual y volver al paso 4 para escanear el próximo
+  transaccion.id_qr = '';
+  transaccion.nombre_insumo = '';
+  transaccion.cantidad = 1;
+  transaccion.peso = 0;
+  document.getElementById('input-qr').value = '';
+  document.getElementById('insumo-card').classList.remove('visible');
+  document.getElementById('bloque-cantidad').style.display = 'none';
+  document.getElementById('vista-previa-cantidad').style.display = 'none';
+  irAPaso(4);
+}
+
+function terminarCarrito() {
+  mostrarPasoConfirmarCarrito();
+}
+
+function mostrarPasoConfirmarCarrito() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('pasoConfirmarCarrito').classList.add('active');
+  document.getElementById('confirmar-carrito-remito').textContent = transaccion.remito;
+
+  const totalPeso = carrito.reduce((acc, it) => acc + it.subtotal, 0);
+  document.getElementById('lista-carrito').innerHTML = carrito.map(it => `
+    <div class="resultado-fila">
+      <span>${it.nombre_insumo}</span>
+      <span>${it.cantidad} × ${it.peso_unitario.toFixed(2)}g = ${it.subtotal.toFixed(2)}g</span>
+    </div>`).join('');
+  document.getElementById('total-carrito').textContent = totalPeso.toFixed(2) + ' g';
+}
+
+function quitarUltimoItemCarrito() {
+  // Permite corregir un error de carga antes de enviar
+  carrito.pop();
+  if (carrito.length === 0) {
+    mostrarPasoOtroMaterial();
+    return;
+  }
+  mostrarPasoConfirmarCarrito();
+}
+
+// Envía cada línea del carrito por separado al backend (Apps Script actual
+// solo acepta una fila por llamada, ver informe). Todas comparten remito.
+// PENDIENTE: el Apps Script todavía no tiene columnas para "peso_unitario"
+// y "cantidad" — se envían igual, por si se agregan más adelante; el campo
+// "peso" ya lleva el total de la línea, así que el registro queda correcto
+// aunque el backend ignore los campos nuevos.
+async function enviarCarritoADropbox() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('paso6').classList.add('active');
+  document.getElementById('bloque-exito').style.display = 'block';
+  document.getElementById('bloque-sin-stock').style.display = 'none';
+  document.getElementById('bloque-sin-wifi').style.display = 'none';
+  const estadoEl = document.getElementById('estado-dropbox');
+
+  for (let i = 0; i < carrito.length; i++) {
+    const item = carrito[i];
+    estadoEl.textContent = '⏳ Registrando ítem ' + (i + 1) + ' de ' + carrito.length + '...';
+    const datosLinea = {
+      tipo: 'INGRESO',
+      id_operador: transaccion.id_operador,
+      id_qr: item.id_qr,
+      peso: item.subtotal,
+      peso_unitario: item.peso_unitario,
+      cantidad: item.cantidad,
+      ot: 'INGRESO_STOCK',
+      remito: transaccion.remito,
+      timestamp: new Date().toISOString()
+    };
+    try {
+      const url = URL_BACKEND + '?datos=' + encodeURIComponent(JSON.stringify(datosLinea));
+      const resp = await fetch(url).then(r => r.json());
+      if (resp.estatus !== 'OK') {
+        estadoEl.textContent = '⚠️ Error en ítem ' + (i + 1) + ': ' + resp.mensaje;
+      }
+    } catch (e) {
+      // Sin conexión: mostrar pantalla de error y guardar la cola pendiente
+      document.getElementById('bloque-exito').style.display = 'none';
+      document.getElementById('bloque-sin-wifi').style.display = 'block';
+      guardarEnCola({ carrito_pendiente: carrito.slice(i), remito: transaccion.remito, id_operador: transaccion.id_operador });
+      return;
+    }
+  }
+
+  mostrarResultadoCarrito();
+  estadoEl.textContent = '✅ ' + carrito.length + ' ítem(s) registrados en el sistema';
+  setTimeout(reiniciarFlujo, 2500);
+}
+
+function mostrarResultadoCarrito() {
+  document.getElementById('bloque-exito').style.display = 'block';
+  const totalPeso = carrito.reduce((acc, it) => acc + it.subtotal, 0);
+  const filas = [
+    ['Operación',  '📥 Ingreso a Stock'],
+    ['Remito',     transaccion.remito],
+    ['Ítems',      carrito.length + ' material(es)'],
+    ['Peso total', totalPeso.toFixed(2) + ' g'],
+  ];
+  document.getElementById('detalle-transaccion').innerHTML =
+    filas.map(([k, v]) => `<div class="resultado-fila"><span>${k}</span><span>${v}</span></div>`).join('') +
+    carrito.map(it => `<div class="resultado-fila"><span>${it.nombre_insumo}</span><span>${it.cantidad} × ${it.peso_unitario.toFixed(2)}g = ${it.subtotal.toFixed(2)}g</span></div>`).join('');
 }
 
 function simularPesoManual() {
@@ -1521,16 +1694,20 @@ function guardarEnCola(t) {
 // REINICIAR
 // ============================================================
 function reiniciarFlujo() {
-  detenerCamara();
-  transaccion = { tipo:'', foto_base64:'', id_operador:'', ot:'', remito:'', id_qr:'', nombre_insumo:'', peso:0, timestamp:'' };
-  fotoTomada = false;
+  transaccion = { tipo:'', id_operador:'', ot:'', remito:'', id_qr:'', nombre_insumo:'', cantidad:1, peso:0, timestamp:'' };
+  carrito = [];
 
   // Limpiar todos los campos
   document.getElementById('input-remito').value = '';
   document.getElementById('input-ot').value = '';
   document.getElementById('input-qr').value = '';
+  document.getElementById('input-qr-operador').value = '';
   document.getElementById('input-peso-manual').value = '';
+  document.getElementById('input-cantidad').value = '1';
+  document.getElementById('operador-card').classList.remove('visible');
   document.getElementById('insumo-card').classList.remove('visible');
+  document.getElementById('bloque-cantidad').style.display = 'none';
+  document.getElementById('vista-previa-cantidad').style.display = 'none';
   document.getElementById('bloque-exito').style.display = 'none';
   document.getElementById('bloque-sin-stock').style.display = 'none';
   document.getElementById('bloque-sin-wifi').style.display = 'none';
