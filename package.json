@@ -1,6 +1,6 @@
 {
   "name": "almacen-piroplast",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "App de gestión de almacén Piroplast (Planta Soplado), empaquetada como app Android con Capacitor",
   "main": "index.js",
   "scripts": {
