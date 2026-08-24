@@ -453,9 +453,6 @@
         <div class="insumo-card-nombre" id="operador-nombre">—</div>
       </div>
 
-      <!-- Respaldo manual: por si el lector falla o el operador todavía no tiene código impreso -->
-      <button class="btn-repetir" id="btn-manual-operador" style="display:block; margin-top:8px; background:transparent; border:1.5px solid var(--borde); color:#607d8b;" onclick="ingresarApellidoManual()">⌨️ Ingresar apellido a mano</button>
-
       <button class="btn-volver" onclick="volverAlInicio()">◀ Volver al inicio</button>
     </div>
 
@@ -554,7 +551,7 @@
       <div class="balanza-display">
         <div class="balanza-label">Lectura de Balanza</div>
         <div class="balanza-valor" id="balanza-valor">- - -</div>
-        <div class="balanza-unidad">gramos</div>
+        <div class="balanza-unidad">kilogramos</div>
         <div class="balanza-estado esperando" id="balanza-estado">
           <div class="pulso" id="pulso-dot"></div>
           <span id="balanza-estado-texto">Esperando lectura...</span>
@@ -586,7 +583,7 @@
           <span class="icono-input">⚖️</span>
           <input type="number"
                  id="input-peso-manual"
-                 placeholder="Peso en gramos"
+                 placeholder="Peso en gramos (simula lo que envía la balanza)"
                  min="0"
                  step="0.01"
                  inputmode="decimal"
@@ -1026,14 +1023,6 @@ function guardarQROperador(codigo) {
   setTimeout(avanzarDesdeFoto, 700);
 }
 
-function ingresarApellidoManual() {
-  const apellido = prompt('Ingresá tu apellido:');
-  if (apellido && apellido.trim()) {
-    transaccion.id_operador = apellido.trim().toUpperCase();
-    avanzarDesdeFoto();
-  }
-}
-
 function avanzarDesdeFoto() {
   // Configurar paso 3 según flujo
   if (transaccion.tipo === 'INGRESO') {
@@ -1388,10 +1377,14 @@ function esperarLecturaConTimeout(timeoutMs) {
 }
 
 
-function recibirPesoDesdeBalanza(gramos) {
-  // Esta función se llamará cuando llegue el dato de la balanza RS-232
-  transaccion.peso = gramos;
-  document.getElementById('balanza-valor').textContent = gramos.toFixed(2);
+function recibirPesoDesdeBalanza(gramosLeidos) {
+  // La balanza (protocolo RS-232 real, o el modo demo que lo simula) siempre
+  // entrega el peso en GRAMOS. Convertimos a kilogramos acá, en un único
+  // lugar, y de ahí en más toda la app (pantalla, carrito, planilla) trabaja
+  // en kg con 2 decimales.
+  const kilos = gramosLeidos / 1000;
+  transaccion.peso = kilos;
+  document.getElementById('balanza-valor').textContent = kilos.toFixed(2);
   document.getElementById('balanza-estado').className = 'balanza-estado recibido';
   document.getElementById('pulso-dot').className = 'pulso activo';
   document.getElementById('balanza-estado-texto').textContent = 'Peso recibido';
@@ -1411,9 +1404,9 @@ function recibirPesoDesdeBalanza(gramos) {
 function mostrarVistaPreviaCantidad() {
   const cantidad = transaccion.cantidad || 1;
   const total = transaccion.peso * cantidad;
-  document.getElementById('preview-peso-unitario').textContent = transaccion.peso.toFixed(2) + ' g';
+  document.getElementById('preview-peso-unitario').textContent = transaccion.peso.toFixed(2) + ' kg';
   document.getElementById('preview-cantidad').textContent = cantidad;
-  document.getElementById('preview-total').textContent = total.toFixed(2) + ' g';
+  document.getElementById('preview-total').textContent = total.toFixed(2) + ' kg';
   document.getElementById('vista-previa-cantidad').style.display = 'block';
 }
 
@@ -1466,9 +1459,9 @@ function mostrarPasoConfirmarCarrito() {
   document.getElementById('lista-carrito').innerHTML = carrito.map(it => `
     <div class="resultado-fila">
       <span>${it.nombre_insumo}</span>
-      <span>${it.cantidad} × ${it.peso_unitario.toFixed(2)}g = ${it.subtotal.toFixed(2)}g</span>
+      <span>${it.cantidad} × ${it.peso_unitario.toFixed(2)}kg = ${it.subtotal.toFixed(2)}kg</span>
     </div>`).join('');
-  document.getElementById('total-carrito').textContent = totalPeso.toFixed(2) + ' g';
+  document.getElementById('total-carrito').textContent = totalPeso.toFixed(2) + ' kg';
 }
 
 function quitarUltimoItemCarrito() {
@@ -1536,11 +1529,11 @@ function mostrarResultadoCarrito() {
     ['Operación',  '📥 Ingreso a Stock'],
     ['Remito',     transaccion.remito],
     ['Ítems',      carrito.length + ' material(es)'],
-    ['Peso total', totalPeso.toFixed(2) + ' g'],
+    ['Peso total', totalPeso.toFixed(2) + ' kg'],
   ];
   document.getElementById('detalle-transaccion').innerHTML =
     filas.map(([k, v]) => `<div class="resultado-fila"><span>${k}</span><span>${v}</span></div>`).join('') +
-    carrito.map(it => `<div class="resultado-fila"><span>${it.nombre_insumo}</span><span>${it.cantidad} × ${it.peso_unitario.toFixed(2)}g = ${it.subtotal.toFixed(2)}g</span></div>`).join('');
+    carrito.map(it => `<div class="resultado-fila"><span>${it.nombre_insumo}</span><span>${it.cantidad} × ${it.peso_unitario.toFixed(2)}kg = ${it.subtotal.toFixed(2)}kg</span></div>`).join('');
 }
 
 function simularPesoManual() {
@@ -1586,7 +1579,7 @@ function mostrarResultado() {
   const filas = [
     ['Operación',  transaccion.tipo === 'INGRESO' ? '📥 Ingreso a Stock' : '📤 Retiro de Stock'],
     ['Insumo',     transaccion.nombre_insumo || transaccion.id_qr],
-    ['Peso',       transaccion.peso.toFixed(2) + ' g'],
+    ['Peso',       transaccion.peso.toFixed(2) + ' kg'],
     transaccion.tipo === 'INGRESO'
       ? ['Remito', transaccion.remito]
       : ['OT',     transaccion.ot],
