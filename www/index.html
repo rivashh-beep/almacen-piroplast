@@ -25,6 +25,10 @@
       --amarillo: #f59f00;
     }
 
+    html {
+      font-size: 32px; /* v4.1: duplica el tamaño base de texto en toda la app */
+    }
+
     body {
       font-family: 'Arial', sans-serif;
       background: var(--fondo);
@@ -33,11 +37,12 @@
       align-items: center;
       justify-content: center;
       padding: 16px;
+      font-weight: 700; /* v4.1: texto en negrita por defecto en toda la app */
     }
 
     .container {
       width: 100%;
-      max-width: 1400px;
+      max-width: 900px; /* v4.1: pensado para uso en vertical, ya no apaisado */
       background: var(--blanco);
       border-radius: 16px;
       box-shadow: 0 6px 24px rgba(0,0,0,0.12);
@@ -47,14 +52,14 @@
     /* HEADER */
     .header {
       background: #1a2533;
-      padding: 18px 24px;
+      padding: 34px 24px; /* v4.1: header mas alto */
       display: flex;
       align-items: center;
       gap: 14px;
     }
     .header-logo {
-      width: 44px;
-      height: 44px;
+      width: 88px; /* v4.1: logo al doble */
+      height: 88px;
       background: #f59f00;
       border-radius: 8px;
       display: flex;
@@ -133,7 +138,7 @@
     }
 
     /* BOTONES PRINCIPALES */
-    .btn-grupo { display: flex; flex-direction: column; gap: 14px; }
+    .btn-grupo { display: flex; flex-direction: column; gap: 28px; } /* v4.1: mas separacion entre botones */
     .btn {
       display: flex;
       align-items: center;
@@ -527,8 +532,8 @@
           <span class="icono-input">🔢</span>
           <input type="number"
                  id="input-cantidad"
-                 value="1"
-                 min="1"
+                 value="0"
+                 min="0"
                  step="1"
                  inputmode="numeric"
                  style="padding-left:46px;">
@@ -555,6 +560,15 @@
         <div class="balanza-estado esperando" id="balanza-estado">
           <div class="pulso" id="pulso-dot"></div>
           <span id="balanza-estado-texto">Esperando lectura...</span>
+        </div>
+      </div>
+
+      <!-- NUEVO v4.1: confirmación del peso leído antes de avanzar -->
+      <div id="confirmar-peso-card" class="insumo-card" style="display:none;">
+        <div class="insumo-card-label">¿Es correcto el peso?</div>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+          <button class="btn btn-confirmar" style="flex:1; padding:16px;" onclick="confirmarPesoLeido()">✅ Confirmar</button>
+          <button class="btn-repetir" style="flex:1; display:block; margin-top:0; background:transparent; border:1.5px solid var(--borde); color:#607d8b;" onclick="repetirPesada()">🔄 Repetir pesada</button>
         </div>
       </div>
 
@@ -791,20 +805,20 @@ const PADRON_INSUMOS = {
 // Los QR correspondientes están en "Pizarra_Operadores_QR.pdf", listos para
 // imprimir y pegar en la pizarra fija de la pared.
 const PADRON_OPERADORES = {
-  "OP01-LOLLI": "LOLLI",
-  "OP02-MELO": "MELO",
-  "OP03-MARTIRES": "MARTIRES",
-  "OP04-VALLEJOS": "VALLEJOS",
-  "OP05-ARIAS": "ARIAS",
-  "OP06-MACHADO": "MACHADO",
-  "OP07-SELIZ": "SELIZ",
-  "OP08-ARAUJO": "ARAUJO",
-  "OP09-DIARTE": "DIARTE",
-  "OP10-SERVIN": "SERVIN",
-  "OP11-EDUARDO": "EDUARDO",
-  "OP12-TROPIANO": "TROPIANO",
-  "OP13-CENA": "CENA",
-  "OP14-CANTERO": "CANTERO",
+  "OP01-LOLLI": "Héctor Lolli",
+  "OP02-MELO": "Luis Melo",
+  "OP03-MARTIRES": "Ramon Martires",
+  "OP04-VALLEJOS": "Catalino Vallejos",
+  "OP05-ARIAS": "Ariel Arias",
+  "OP06-MACHADO": "Dario Machado",
+  "OP07-SELIZ": "Javier Seliz",
+  "OP08-ARAUJO": "Damian Araujo",
+  "OP09-DIARTE": "Carlos Diarte",
+  "OP10-SERVIN": "William Servin",
+  "OP11-EDUARDO": "Angel Eduardo",
+  "OP12-TROPIANO": "Fernando Tropiano",
+  "OP13-CENA": "Rodrigo Cena",
+  "OP14-CANTERO": "Raúl Cantero",
 };
 
 // Stock local — todos en 0 para inicio de operaciones
@@ -937,7 +951,9 @@ function irAPaso(n) {
   }
   if (n === 3) {
     if (transaccion.tipo === 'INGRESO') {
-      setTimeout(() => document.getElementById('input-remito').focus(), 200);
+      // v4.1: foco inmediato (sin demora) — Android es más propenso a abrir
+      // el teclado automático cuando el foco se dispara sin setTimeout.
+      document.getElementById('input-remito').focus();
     } else {
       // QR OT: foco directo, inputmode="none" ya suprime el teclado
       setTimeout(() => {
@@ -953,6 +969,7 @@ function irAPaso(n) {
   }
   if (n === 5) {
     document.getElementById('vista-previa-cantidad').style.display = 'none';
+    document.getElementById('confirmar-peso-card').style.display = 'none';
     // Intenta reconectar solo si el navegador ya autorizó la balanza antes.
     // Si es la primera vez, el operador debe tocar "Conectar Balanza".
     intentarReconexionAutomatica();
@@ -1023,13 +1040,19 @@ function volverAlInicio() {
 // estén impresos y pegados en la pizarra.
 // ============================================================
 
-function guardarQROperador(codigo) {
+function guardarQROperador(codigoCrudo) {
+  // FIX v4.1: el lector QR tiene configurado el guion como apóstrofo en su
+  // layout de teclado (ej. envía "OP12'TROPIANO" en vez de "OP12-TROPIANO"),
+  // por eso normalizamos cualquier variante de comilla/apóstrofo a guion
+  // antes de buscar en el padrón.
+  const codigo = codigoCrudo.replace(/['´`]/g, '-').toUpperCase();
+
   const nombre = PADRON_OPERADORES[codigo];
   transaccion.id_operador = nombre || codigo;
 
   document.getElementById('input-qr-operador').value = codigo;
   document.getElementById('operador-nombre').textContent =
-    nombre || ('Código: ' + codigo + ' (no está en el padrón)');
+    nombre || ('No está en el padrón (código: ' + codigo + ')');
   document.getElementById('operador-card').classList.add('visible');
 
   // Avanza automático, mismo patrón que guardarQRInsumo()
@@ -1105,8 +1128,11 @@ function guardarQRInsumo(codigo) {
   // cantidad = total antes de confirmar. El operador avanza a mano con
   // "Continuar" (ver confirmarCantidadYAvanzar()).
   if (transaccion.tipo === 'INGRESO') {
-    document.getElementById('input-cantidad').value = 1;
+    document.getElementById('input-cantidad').value = 0;
     document.getElementById('bloque-cantidad').style.display = 'block';
+    // v4.1: foco inmediato para que el teclado numérico se abra solo
+    document.getElementById('input-cantidad').focus();
+    document.getElementById('input-cantidad').select();
     return;
   }
 
@@ -1129,16 +1155,18 @@ function avanzarAPesoDesdeInsumo() {
   document.getElementById('instruccion-peso').textContent = instruccion;
   irAPaso(5);
 
-  // Si la balanza ya estaba conectada desde una operación anterior (misma
-  // sesión de la app), el botón "Conectar Balanza" quedó oculto y no hay
-  // forma de volver a dispararlo con un toque -- iniciamos la lectura
-  // automáticamente, ya que el puerto USB sigue abierto y no hace falta
-  // volver a pedir permiso.
+  // v4.1: ya NO se dispara la lectura sola. El operador siempre tiene que
+  // tocar el botón "Pesar Insumo" (o "Conectar Balanza" la primera vez) de
+  // forma explícita, para cada pesada.
+  document.getElementById('balanza-valor').textContent = '- - -';
+  document.getElementById('balanza-estado').className = 'balanza-estado esperando';
+  const boton = document.getElementById('btn-conectar-balanza');
   if (balanzaConectada) {
-    document.getElementById('balanza-valor').textContent = '- - -';
-    document.getElementById('balanza-estado').className = 'balanza-estado esperando';
-    document.getElementById('balanza-estado-texto').textContent = 'Esperando peso estable...';
-    leerPesoBalanza();
+    boton.textContent = '⚖️ Pesar Insumo';
+    document.getElementById('balanza-estado-texto').textContent = 'Toque "Pesar Insumo" cuando esté listo.';
+  } else {
+    boton.textContent = '🔌 Conectar Balanza';
+    document.getElementById('balanza-estado-texto').textContent = 'Toque "Conectar Balanza" para iniciar.';
   }
 }
 
@@ -1301,7 +1329,10 @@ async function iniciarEscuchaBalanza() {
       balanzaConectada = true;
     }
     await registrarCallbackLecturaSiHaceFalta();
-    document.getElementById('btn-conectar-balanza').style.display = 'none';
+    // v4.1: el botón queda siempre visible (ya no se oculta) para que el
+    // operador dispare cada pesada a mano, de forma explícita.
+    const boton = document.getElementById('btn-conectar-balanza');
+    boton.textContent = '⚖️ Pesar Insumo';
     document.getElementById('balanza-estado-texto').textContent = 'Balanza conectada. Esperando peso estable...';
     leerPesoBalanza();
   } catch (err) {
@@ -1403,15 +1434,34 @@ function recibirPesoDesdeBalanza(gramosLeidos) {
   document.getElementById('balanza-estado-texto').textContent = 'Peso recibido';
   document.getElementById('bloque-demo-balanza').style.display = 'none';
 
-  // NUEVO v4 (Punto 2/3): en Ingreso mostramos la vista previa peso × cantidad
-  // y esperamos que el operador confirme "Agregar a la lista" (carrito).
+  // NUEVO v4.1: antes de seguir, pedimos que el operador confirme que el
+  // peso mostrado es el correcto (o repita la pesada si no lo es).
+  document.getElementById('confirmar-peso-card').style.display = 'block';
+}
+
+// El operador confirmó que el peso leído es correcto: recién ahí seguimos
+// con el flujo normal (vista previa de cantidad en Ingreso, o el envío
+// directo en Egreso).
+function confirmarPesoLeido() {
+  document.getElementById('confirmar-peso-card').style.display = 'none';
+
   if (transaccion.tipo === 'INGRESO') {
     mostrarVistaPreviaCantidad();
     return;
   }
 
   // Egreso: sin cambios, un solo ítem, avanza automático
-  setTimeout(procesarTransaccionFinal, 1000);
+  procesarTransaccionFinal();
+}
+
+// El operador dijo que el peso no es correcto: se oculta la confirmación y
+// se vuelve a disparar una lectura nueva.
+function repetirPesada() {
+  document.getElementById('confirmar-peso-card').style.display = 'none';
+  document.getElementById('balanza-valor').textContent = '- - -';
+  document.getElementById('balanza-estado').className = 'balanza-estado esperando';
+  document.getElementById('balanza-estado-texto').textContent = 'Esperando peso estable...';
+  leerPesoBalanza();
 }
 
 function mostrarVistaPreviaCantidad() {
@@ -1709,11 +1759,12 @@ function reiniciarFlujo() {
   document.getElementById('input-qr').value = '';
   document.getElementById('input-qr-operador').value = '';
   document.getElementById('input-peso-manual').value = '';
-  document.getElementById('input-cantidad').value = '1';
+  document.getElementById('input-cantidad').value = '0';
   document.getElementById('operador-card').classList.remove('visible');
   document.getElementById('insumo-card').classList.remove('visible');
   document.getElementById('bloque-cantidad').style.display = 'none';
   document.getElementById('vista-previa-cantidad').style.display = 'none';
+  document.getElementById('confirmar-peso-card').style.display = 'none';
   document.getElementById('bloque-exito').style.display = 'none';
   document.getElementById('bloque-sin-stock').style.display = 'none';
   document.getElementById('bloque-sin-wifi').style.display = 'none';
